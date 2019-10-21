@@ -1,5 +1,5 @@
 "
-""I am Clarice, a SoulSeek client made with Pharo""
+""I am Clarice, a SoulSeek client made with Pharo.""
 "
 Class {
 	#name : #Clarice,
