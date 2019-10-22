@@ -7,3 +7,13 @@ Class {
 	#type : #bytes,
 	#category : #Clarice
 }
+
+{ #category : #initialization }
+IntegerPacked >> initialize [
+	super initialize
+]
+
+{ #category : #'as yet unclassified' }
+IntegerPacked >> pack: aNumber width: aWidth [
+	^ (aNumber asByteArray hex padRightTo: aWidth with: $0)
+]
