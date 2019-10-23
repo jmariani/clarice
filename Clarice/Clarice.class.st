@@ -50,6 +50,23 @@ Class {
 	#category : #Clarice
 }
 
+{ #category : #initialization }
+Clarice class >> packNumberAsByteArray: aNumber width: bytes [
+	"I take aNumber as a parameter and return a ByteArray 4 or 8 bytes width"
+
+	bytes = 4
+		ifTrue: [ ^ {0 . 0 . 0 . 0} asByteArray
+				replaceFrom: 1
+				to: bytes asByteArray size
+				with: aNumber asByteArray ].
+	bytes = 8
+		ifTrue: [ ^ {0 . 0 . 0 . 0 . 0 . 0 . 0 . 0} asByteArray
+				replaceFrom: 1
+				to: bytes asByteArray size
+				with: aNumber asByteArray ].
+	self error: 'width must be 4 or 8 bytes'
+]
+
 { #category : #accessing }
 Clarice >> autojoin [
 	^ autojoin
@@ -311,7 +328,7 @@ Clarice >> loggedIn: anObject [
 	loggedIn := anObject
 ]
 
-{ #category : #initialization }
+{ #category : #messages }
 Clarice >> login [
 	"I am the login method"
 
@@ -388,6 +405,71 @@ Clarice >> login [
 		binary.
 	stream isConnected
 		ifTrue: [ stream sendCommand: message ]
+]
+
+{ #category : #messages }
+Clarice >> loginAs: myUsername with: myPassword [
+	"I am the login method"
+
+	"login ( or connect first) to the soulseek server and send our initializing packets ( upload speed, share count, joined rooms, etc.)"
+
+	"I will compose the message to be sent to the SoulSeek server"
+
+	"Message structure:
+	- Message length
+	- Message code
+	- Username length
+	- Username
+	- Password length
+	- Password
+	- Version
+	- Hash length
+	- Hash
+	- Number"
+
+	"scope: class-variables  &  instance-variables"
+
+	| buffer hash stream message messageCode messageSize number packedSizeOfHash passwordAsHex packedSizeOfPassword packedSizeOfUsername usernameAsHex version |
+	Transcript
+		show: 'I am the login method';
+		cr.
+
+	"I will test if username is valid"
+	myUsername ifNil: [ self error: 'Invalid username' ].
+	"I will test if password is valid"
+	myPassword ifNil: [ self error: 'Invalid password' ].
+
+	"Hash field: MD5 hex digest of concatenated username & password"
+	hash := (MD5 new hashMessage: myUsername , myPassword) hex.
+
+	"set up buffer"
+	buffer := ByteArray new writeStream.
+
+	"fill buffer"
+	buffer
+		nextPutAll: (self class packNumberAsByteArray: 1 width: 4);
+		nextPutAll: (self class packNumberAsByteArray: myUsername size width: 4);
+		nextPutAll: myUsername asByteArray;
+		nextPutAll: (self class packNumberAsByteArray: myPassword size width: 4);
+		nextPutAll: myPassword asByteArray;
+		nextPutAll: (self class packNumberAsByteArray: 157 width: 4);
+		nextPutAll: (self class packNumberAsByteArray: hash size width: 4);
+		nextPutAll: hash asByteArray;
+		nextPutAll: (self class packNumberAsByteArray: 100 width: 4).
+		
+		"--- Open a socket ---"
+	stream := SocketStream
+		openConnectionToHostNamed: 'vps.slsknet.org'
+		port: 2416.
+	stream
+		binary;
+		autoFlush: false.
+		"--- Send the buffer to the server ---"
+	stream
+		nextPutAll:
+			(self class packNumberAsByteArray: buffer size asByteArray width: 4);
+		nextPutAll: buffer contents.
+	stream flush
 ]
 
 { #category : #accessing }
