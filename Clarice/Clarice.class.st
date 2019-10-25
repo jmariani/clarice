@@ -34,6 +34,7 @@ Class {
 		'potentialParents',
 		'rooms',
 		'server',
+		'serverSocket',
 		'sharedFolder',
 		'shareList',
 		'status',
@@ -57,12 +58,12 @@ Clarice class >> packNumberAsByteArray: aNumber width: bytes [
 	bytes = 4
 		ifTrue: [ ^ {0 . 0 . 0 . 0} asByteArray
 				replaceFrom: 1
-				to: bytes asByteArray size
+				to: aNumber asByteArray size
 				with: aNumber asByteArray ].
 	bytes = 8
 		ifTrue: [ ^ {0 . 0 . 0 . 0 . 0 . 0 . 0 . 0} asByteArray
 				replaceFrom: 1
-				to: bytes asByteArray size
+				to: aNumber asByteArray size
 				with: aNumber asByteArray ].
 	self error: 'width must be 4 or 8 bytes'
 ]
@@ -416,9 +417,9 @@ Clarice >> loginAs: myUsername with: myPassword [
 	"I will compose the message to be sent to the SoulSeek server"
 
 	"Message structure:
-	- Message length
-	- Message code
-	- Username length
+	- Message length (ByteArray 4)
+	- Message code (ByteArray 4)
+	- Username length (ByteArray 4)
 	- Username
 	- Password length
 	- Password
@@ -429,7 +430,7 @@ Clarice >> loginAs: myUsername with: myPassword [
 
 	"scope: class-variables  &  instance-variables"
 
-	| buffer hash stream message messageCode messageSize number packedSizeOfHash passwordAsHex packedSizeOfPassword packedSizeOfUsername usernameAsHex version |
+	| buffer chunk chunkSize hash |
 	Transcript
 		show: 'I am the login method';
 		cr.
@@ -456,20 +457,28 @@ Clarice >> loginAs: myUsername with: myPassword [
 		nextPutAll: (self class packNumberAsByteArray: hash size width: 4);
 		nextPutAll: hash asByteArray;
 		nextPutAll: (self class packNumberAsByteArray: 100 width: 4).
-		
-		"--- Open a socket ---"
-	stream := SocketStream
-		openConnectionToHostNamed: 'vps.slsknet.org'
-		port: 2416.
-	stream
-		binary;
-		autoFlush: false.
-		"--- Send the buffer to the server ---"
-	stream
-		nextPutAll:
-			(self class packNumberAsByteArray: buffer size asByteArray width: 4);
-		nextPutAll: buffer contents.
-	stream flush
+
+	"--- Open a socket ---"
+	self
+		serverSocket: (SocketStream openConnectionToHostNamed: 'vps.slsknet.org' port: 2416).
+	"--- set socket as binary ---"
+	self serverSocket binary.
+
+	"--- Send the buffer to the server ---"
+	self sendMessage: buffer.
+	Transcript show: self serverSocket debug .
+	
+	"--- if socket is connected set listeing port ---"
+	self serverSocket isConnected
+		ifFalse: [ self error: 'Socket not connected' ].
+	"	self setListeningPort: 2235."
+	self serverSocket isDataAvailable
+		ifFalse: [ Transcript show: 'No data available'.
+			(Delay forMilliseconds: 100) wait ].
+	chunkSize := 5.
+	[ self serverSocket isDataAvailable ]
+		whileTrue: [ chunk := self serverSocket next: chunkSize.
+			chunk crTrace ]
 ]
 
 { #category : #accessing }
@@ -582,6 +591,17 @@ Clarice >> rooms: anObject [
 	rooms := anObject
 ]
 
+{ #category : #messages }
+Clarice >> sendMessage: aByteArray [ 
+	"I send messages to the SoulSeek server"
+
+	"--- Send the buffer to the server ---"
+	self serverSocket
+		nextPutAll: (self class packNumberAsByteArray: aByteArray size asByteArray width: 4);
+		nextPutAllFlush: aByteArray contents
+
+]
+
 { #category : #accessing }
 Clarice >> server [
 	^ server
@@ -590,6 +610,39 @@ Clarice >> server [
 { #category : #accessing }
 Clarice >> server: anObject [
 	server := anObject
+]
+
+{ #category : #accessing }
+Clarice >> serverSocket [
+^serverSocket
+]
+
+{ #category : #accessing }
+Clarice >> serverSocket: aSocketStream [ 
+serverSocket := aSocketStream 
+]
+
+{ #category : #messages }
+Clarice >> setListeningPort: aPort [
+	"I take a parameter and send a message to the server telling is the listening port"
+
+	| buffer |
+	Transcript
+		show: 'I am the setListeningPort method';
+		cr.
+
+	"set up buffer"
+	buffer := ByteArray new writeStream.
+
+	"fill buffer"
+	buffer
+		nextPutAll: (self class packNumberAsByteArray: 2 width: 4);
+		nextPutAll: (self class packNumberAsByteArray: aPort width: 4).
+
+	"--- Use existing socket ---"
+
+	"--- Send the buffer to the server ---"
+	self sendMessage: buffer
 ]
 
 { #category : #accessing }
