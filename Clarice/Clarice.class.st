@@ -330,85 +330,6 @@ Clarice >> loggedIn: anObject [
 ]
 
 { #category : #messages }
-Clarice >> login [
-	"I am the login method"
-
-	"login ( or connect first) to the soulseek server and send our initializing packets ( upload speed, share count, joined rooms, etc.)"
-
-	"I will compose the message to be sent to the SoulSeek server"
-
-	"Message structure:
-	- Message length
-	- Message code
-	- Username length
-	- Username
-	- Password length
-	- Password
-	- Version
-	- Hash length
-	- Hash
-	- Number"
-
-	"scope: class-variables  &  instance-variables"
-
-	| hash message messageCode messageSize number packedSizeOfHash passwordAsHex packedSizeOfPassword packedSizeOfUsername stream usernameAsHex version |
-	Transcript
-		show: 'I am the login method';
-		cr.
-
-	"I will test if username is valid"
-	self username ifNil: [ self error: 'Invalid username' ].
-	"I will test if password is valid"
-	self password ifNil: [ self error: 'Invalid password' ].
-
-	"I'll build the message to send to the SoulSeek server"
-	"Number field"
-	number := 1 asByteArray hex padRightTo: 8 with: $0.
-
-	"Hash field: MD5 hex digest of concatenated username & password"
-	hash := (MD5 new hashMessage: self username , self password) hex.
-
-	"Hash length field"
-	packedSizeOfHash := hash size asByteArray hex padRightTo: 8 with: $0.
-
-	"Version field"
-	version := 181 asByteArray hex padRightTo: 8 with: $0.
-	"Password"
-	passwordAsHex := self password asByteArray hex.
-	"Password length field"
-	packedSizeOfPassword := self password size asByteArray hex
-		padRightTo: 8
-		with: $0.
-	"Username"
-	usernameAsHex := self username asByteArray hex.
-	"Username length"
-	packedSizeOfUsername := self username size asByteArray hex
-		padRightTo: 8
-		with: $0.
-	"Message code field"
-	messageCode := 1 asByteArray hex padRightTo: 8 with: $0.
-	message := messageCode , packedSizeOfUsername , usernameAsHex
-		, packedSizeOfPassword , passwordAsHex , version , packedSizeOfHash
-		, hash asByteArray hex , number.
-
-	"Message size"
-	messageSize := message size / 2.
-	message := (messageSize asByteArray hex padRightTo: 8 with: $0)
-		, message.
-	Transcript
-		show: message;
-		cr.
-	"I finished composing the payload"
-
-	"I will connect to SoulSeek server"
-	stream := SocketStream new
-		openConnectionToHostNamed: self server port: self port;
-		binary.
-	stream isConnected
-		ifTrue: [ stream sendCommand: message ]
-]
-
-{ #category : #messages }
 Clarice >> loginAs: myUsername with: myPassword [
 	"I am the login method"
 
@@ -430,7 +351,7 @@ Clarice >> loginAs: myUsername with: myPassword [
 
 	"scope: class-variables  &  instance-variables"
 
-	| buffer chunk chunkSize hash |
+	| buffer chunk chunkSize hash response responseCode responseSize |
 	Transcript
 		show: 'I am the login method';
 		cr.
@@ -460,25 +381,16 @@ Clarice >> loginAs: myUsername with: myPassword [
 
 	"--- Open a socket ---"
 	self
-		serverSocket: (SocketStream openConnectionToHostNamed: 'vps.slsknet.org' port: 2416).
+		serverSocket: (SocketStream openConnectionToHostNamed: 'vps.slsknet.org' port: 2416).	"Zdc"
 	"--- set socket as binary ---"
 	self serverSocket binary.
+	self serverSocket autoFlush: true.
 
 	"--- Send the buffer to the server ---"
 	self sendMessage: buffer.
-	Transcript show: self serverSocket debug .
-	
-	"--- if socket is connected set listeing port ---"
 	self serverSocket isConnected
 		ifFalse: [ self error: 'Socket not connected' ].
-	"	self setListeningPort: 2235."
-	self serverSocket isDataAvailable
-		ifFalse: [ Transcript show: 'No data available'.
-			(Delay forMilliseconds: 100) wait ].
-	chunkSize := 5.
-	[ self serverSocket isDataAvailable ]
-		whileTrue: [ chunk := self serverSocket next: chunkSize.
-			chunk crTrace ]
+self processServerResponse 
 ]
 
 { #category : #accessing }
@@ -581,6 +493,41 @@ Clarice >> potentialParents: anObject [
 	potentialParents := anObject
 ]
 
+{ #category : #messages }
+Clarice >> processLoginResponse: response [
+	"I process the login message response"
+
+	| chunk |
+	chunk := response next: 4.
+	chunk reverse asInteger = 1
+		ifFalse: [ Transcript show: (response next: response size - 4) ].
+		
+		self halt.
+]
+
+{ #category : #messages }
+Clarice >> processServerResponse [
+	"I  process the server response"
+
+	| chunk response responseCode responseSize |
+	"--- wait until there' data available ---"
+	[ self serverSocket isDataAvailable ]
+		whileFalse: [ (Delay forMilliseconds: 100) wait ].
+
+	"--- first four bytes is message size (not including these bytes)---"
+	chunk := self serverSocket next: 4.
+	responseSize := chunk reverse asInteger - 4.
+	"--- next four bytes is response code ---"
+	chunk := self serverSocket next: 4.
+	responseCode := chunk reverse asInteger.
+	"--- read response ---"
+	response := self serverSocket next: responseSize.
+	"--- do according the responseCode ---"
+	"--- code 1 is a response to the login message ---"
+	responseCode = 1
+		ifTrue: [ self processLoginResponse: response ]
+]
+
 { #category : #accessing }
 Clarice >> rooms [
 	^ rooms
@@ -592,14 +539,17 @@ Clarice >> rooms: anObject [
 ]
 
 { #category : #messages }
-Clarice >> sendMessage: aByteArray [ 
+Clarice >> sendMessage: aByteArray [
 	"I send messages to the SoulSeek server"
 
 	"--- Send the buffer to the server ---"
-	self serverSocket
-		nextPutAll: (self class packNumberAsByteArray: aByteArray size asByteArray width: 4);
-		nextPutAllFlush: aByteArray contents
 
+	self serverSocket
+		nextPutAll:
+			(self class
+				packNumberAsByteArray: aByteArray size asByteArray
+				width: 4);
+		nextPutAll: aByteArray contents. self serverSocket flush
 ]
 
 { #category : #accessing }
