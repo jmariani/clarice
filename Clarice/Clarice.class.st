@@ -351,7 +351,7 @@ Clarice >> loginAs: myUsername with: myPassword [
 
 	"scope: class-variables  &  instance-variables"
 
-	| buffer chunk chunkSize hash response responseCode responseSize |
+	| buffer hash x |
 	Transcript
 		show: 'I am the login method';
 		cr.
@@ -360,7 +360,7 @@ Clarice >> loginAs: myUsername with: myPassword [
 	myUsername ifNil: [ self error: 'Invalid username' ].
 	"I will test if password is valid"
 	myPassword ifNil: [ self error: 'Invalid password' ].
-
+	x := SSLogin new username: myUsername;password: myPassword;encode.
 	"Hash field: MD5 hex digest of concatenated username & password"
 	hash := (MD5 new hashMessage: myUsername , myPassword) hex.
 
@@ -390,7 +390,7 @@ Clarice >> loginAs: myUsername with: myPassword [
 	self sendMessage: buffer.
 	self serverSocket isConnected
 		ifFalse: [ self error: 'Socket not connected' ].
-self processServerResponse 
+	self processServerResponse
 ]
 
 { #category : #accessing }
