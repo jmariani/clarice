@@ -1,5 +1,17 @@
 "
-I am the login message
+I am the login message. My code is 1
+
+Message structure:
+	- Message length (Not including this field) (ByteArray 4)
+	- Message code (ByteArray 4)
+	- Username length (ByteArray 4)
+	- Username
+	- Password length
+	- Password
+	- Version
+	- Hash length
+	- Hash
+	- Number
 "
 Class {
 	#name : #SSLogin,
@@ -11,8 +23,13 @@ Class {
 	#category : #Clarice
 }
 
+{ #category : #accessing }
+SSLogin >> code [
+	^ 1
+]
+
 { #category : #encoding }
-SSLogin >> encode [ 
+SSLogin >> encode [
 	| buffer hash |
 	"Hash field: MD5 hex digest of concatenated username & password"
 	hash := (MD5 new hashMessage: self username , self password) hex.
@@ -22,15 +39,15 @@ SSLogin >> encode [
 
 	"fill buffer"
 	buffer
-		nextPutAll: (self class packNumberAsByteArray: 1 width: 4);
+		nextPutAll: self codePacked;
 		nextPutAll: (self class packNumberAsByteArray: self username size width: 4);
 		nextPutAll: self username asByteArray;
 		nextPutAll: (self class packNumberAsByteArray: self password size width: 4);
 		nextPutAll: self password asByteArray;
-		nextPutAll: (self class packNumberAsByteArray: 157 width: 4);
+		nextPutAll: (self class packNumberAsByteArray: self majorVersion  width: 4);
 		nextPutAll: (self class packNumberAsByteArray: hash size width: 4);
 		nextPutAll: hash asByteArray;
-		nextPutAll: (self class packNumberAsByteArray: 100 width: 4).
+		nextPutAll: (self class packNumberAsByteArray: self minorVersion  width: 4).
 	^ buffer
 ]
 
@@ -52,4 +69,11 @@ SSLogin >> username [
 { #category : #accessing }
 SSLogin >> username: anObject [
 	username := anObject
+]
+
+{ #category : #'instance creation' }
+SSLogin >> username: anUsername password: aPassword [
+	self username: anUsername;password: aPassword .
+	
+	
 ]

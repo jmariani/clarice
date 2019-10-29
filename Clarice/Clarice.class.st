@@ -204,7 +204,6 @@ Clarice >> initialize [
 
 	"This method initializes several instance variables"
 
-	| temporary variable names |
 	super initialize.
 	server := 'vps.slsknet.org'.
 	port := 2416.
@@ -335,23 +334,6 @@ Clarice >> loginAs: myUsername with: myPassword [
 
 	"login ( or connect first) to the soulseek server and send our initializing packets ( upload speed, share count, joined rooms, etc.)"
 
-	"I will compose the message to be sent to the SoulSeek server"
-
-	"Message structure:
-	- Message length (ByteArray 4)
-	- Message code (ByteArray 4)
-	- Username length (ByteArray 4)
-	- Username
-	- Password length
-	- Password
-	- Version
-	- Hash length
-	- Hash
-	- Number"
-
-	"scope: class-variables  &  instance-variables"
-
-	| buffer hash x |
 	Transcript
 		show: 'I am the login method';
 		cr.
@@ -360,24 +342,6 @@ Clarice >> loginAs: myUsername with: myPassword [
 	myUsername ifNil: [ self error: 'Invalid username' ].
 	"I will test if password is valid"
 	myPassword ifNil: [ self error: 'Invalid password' ].
-	x := SSLogin new username: myUsername;password: myPassword;encode.
-	"Hash field: MD5 hex digest of concatenated username & password"
-	hash := (MD5 new hashMessage: myUsername , myPassword) hex.
-
-	"set up buffer"
-	buffer := ByteArray new writeStream.
-
-	"fill buffer"
-	buffer
-		nextPutAll: (self class packNumberAsByteArray: 1 width: 4);
-		nextPutAll: (self class packNumberAsByteArray: myUsername size width: 4);
-		nextPutAll: myUsername asByteArray;
-		nextPutAll: (self class packNumberAsByteArray: myPassword size width: 4);
-		nextPutAll: myPassword asByteArray;
-		nextPutAll: (self class packNumberAsByteArray: 157 width: 4);
-		nextPutAll: (self class packNumberAsByteArray: hash size width: 4);
-		nextPutAll: hash asByteArray;
-		nextPutAll: (self class packNumberAsByteArray: 100 width: 4).
 
 	"--- Open a socket ---"
 	self
@@ -387,7 +351,10 @@ Clarice >> loginAs: myUsername with: myPassword [
 	self serverSocket autoFlush: true.
 
 	"--- Send the buffer to the server ---"
-	self sendMessage: buffer.
+	self
+		sendMessage: (SSLogin new
+		username: myUsername
+		password: myPassword).
 	self serverSocket isConnected
 		ifFalse: [ self error: 'Socket not connected' ].
 	self processServerResponse
@@ -539,7 +506,7 @@ Clarice >> rooms: anObject [
 ]
 
 { #category : #messages }
-Clarice >> sendMessage: aByteArray [
+Clarice >> sendMessage: aMessage [
 	"I send messages to the SoulSeek server"
 
 	"--- Send the buffer to the server ---"
@@ -547,9 +514,12 @@ Clarice >> sendMessage: aByteArray [
 	self serverSocket
 		nextPutAll:
 			(self class
-				packNumberAsByteArray: aByteArray size asByteArray
+			packNumberAsByteArray: aMessage encode size asByteArray
+				"packNumberAsByteArray: aByteArray size asByteArray"
 				width: 4);
-		nextPutAll: aByteArray contents. self serverSocket flush
+"		nextPutAll: aByteArray contents."
+		nextPutAll: aMessage encode.
+	self serverSocket flush
 ]
 
 { #category : #accessing }
