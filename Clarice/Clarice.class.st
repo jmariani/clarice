@@ -486,6 +486,11 @@ Clarice >> rooms: anObject [
 	rooms := anObject
 ]
 
+{ #category : #run }
+Clarice >> run [ 
+
+]
+
 { #category : #messages }
 Clarice >> sendMessage: aMessage [
 	"I send messages to the SoulSeek server"
