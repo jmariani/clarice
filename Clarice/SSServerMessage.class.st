@@ -17,7 +17,7 @@ SSServerMessage class >> code [
 	^ self subclassResponsibility 
 ]
 
-{ #category : #accessing }
+{ #category : #encoding }
 SSServerMessage class >> codePacked [
 	^ ClariceHelper packNumberAsByteArray: self  code width: 4
 ]
@@ -32,12 +32,12 @@ SSServerMessage class >> majorVersion [
 ^157
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #accessing }
 SSServerMessage class >> majorVersionPacked [
 	^ ClariceHelper packNumberAsByteArray: self majorVersion  width: 4
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #accessing }
 SSServerMessage class >> messageCodes [
 	| x |
 	x := Dictionary new.
