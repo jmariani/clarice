@@ -51,23 +51,6 @@ Class {
 	#category : #Clarice
 }
 
-{ #category : #initialization }
-Clarice class >> packNumberAsByteArray: aNumber width: bytes [
-	"I take aNumber as a parameter and return a ByteArray 4 or 8 bytes width"
-
-	bytes = 4
-		ifTrue: [ ^ {0 . 0 . 0 . 0} asByteArray
-				replaceFrom: 1
-				to: aNumber asByteArray size
-				with: aNumber asByteArray ].
-	bytes = 8
-		ifTrue: [ ^ {0 . 0 . 0 . 0 . 0 . 0 . 0 . 0} asByteArray
-				replaceFrom: 1
-				to: aNumber asByteArray size
-				with: aNumber asByteArray ].
-	self error: 'width must be 4 or 8 bytes'
-]
-
 { #category : #accessing }
 Clarice >> autojoin [
 	^ autojoin
@@ -352,9 +335,7 @@ Clarice >> loginAs: myUsername with: myPassword [
 
 	"--- Send the buffer to the server ---"
 	self
-		sendMessage: (SSLogin new
-		username: myUsername
-		password: myPassword).
+		sendMessage: (SSLogin username: myUsername password: myPassword).
 	self serverSocket isConnected
 		ifFalse: [ self error: 'Socket not connected' ].
 	self processServerResponse
@@ -513,12 +494,12 @@ Clarice >> sendMessage: aMessage [
 
 	self serverSocket
 		nextPutAll:
-			(self class
-			packNumberAsByteArray: aMessage encode size asByteArray
-				"packNumberAsByteArray: aByteArray size asByteArray"
+			(ClariceHelper
+				packNumberAsByteArray: aMessage encode size asByteArray
 				width: 4);
-"		nextPutAll: aByteArray contents."
-		nextPutAll: aMessage encode.
+		"		nextPutAll: aByteArray contents."
+			nextPutAll: aMessage encode.
+	"packNumberAsByteArray: aByteArray size asByteArray"
 	self serverSocket flush
 ]
 
@@ -556,8 +537,8 @@ Clarice >> setListeningPort: aPort [
 
 	"fill buffer"
 	buffer
-		nextPutAll: (self class packNumberAsByteArray: 2 width: 4);
-		nextPutAll: (self class packNumberAsByteArray: aPort width: 4).
+		nextPutAll: (ClariceHelper packNumberAsByteArray: 2 width: 4);
+		nextPutAll: (ClariceHelper packNumberAsByteArray: aPort width: 4).
 
 	"--- Use existing socket ---"
 

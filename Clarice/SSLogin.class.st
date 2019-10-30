@@ -16,20 +16,20 @@ Message structure:
 Class {
 	#name : #SSLogin,
 	#superclass : #SSServerMessage,
-	#instVars : [
-		'username',
-		'password'
+	#classVars : [
+		'password',
+		'username'
 	],
 	#category : #Clarice
 }
 
 { #category : #accessing }
-SSLogin >> code [
+SSLogin class >> code [
 	^ 1
 ]
 
 { #category : #encoding }
-SSLogin >> encode [
+SSLogin class >> encode [
 	| buffer hash |
 	"Hash field: MD5 hex digest of concatenated username & password"
 	hash := (MD5 new hashMessage: self username , self password) hex.
@@ -40,39 +40,39 @@ SSLogin >> encode [
 	"fill buffer"
 	buffer
 		nextPutAll: self codePacked;
-		nextPutAll: (self class packNumberAsByteArray: self username size width: 4);
+		nextPutAll: (ClariceHelper packNumberAsByteArray: self username size width: 4);
 		nextPutAll: self username asByteArray;
-		nextPutAll: (self class packNumberAsByteArray: self password size width: 4);
+		nextPutAll: (ClariceHelper packNumberAsByteArray: self password size width: 4);
 		nextPutAll: self password asByteArray;
-		nextPutAll: (self class packNumberAsByteArray: self majorVersion  width: 4);
-		nextPutAll: (self class packNumberAsByteArray: hash size width: 4);
+		nextPutAll: (ClariceHelper packNumberAsByteArray: self majorVersion width: 4);
+		nextPutAll: (ClariceHelper packNumberAsByteArray: hash size width: 4);
 		nextPutAll: hash asByteArray;
-		nextPutAll: (self class packNumberAsByteArray: self minorVersion  width: 4).
+		nextPutAll: (ClariceHelper packNumberAsByteArray: self minorVersion width: 4).
 	^ buffer
 ]
 
 { #category : #accessing }
-SSLogin >> password [
+SSLogin class >> password [
 	^ password
 ]
 
 { #category : #accessing }
-SSLogin >> password: anObject [
+SSLogin class >> password: anObject [
 	password := anObject
 ]
 
 { #category : #accessing }
-SSLogin >> username [
+SSLogin class >> username [
 	^ username
 ]
 
 { #category : #accessing }
-SSLogin >> username: anObject [
+SSLogin class >> username: anObject [
 	username := anObject
 ]
 
 { #category : #'instance creation' }
-SSLogin >> username: anUsername password: aPassword [
+SSLogin class >> username: anUsername password: aPassword [
 	self username: anUsername;password: aPassword .
 	
 	
