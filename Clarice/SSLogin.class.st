@@ -48,7 +48,7 @@ SSLogin class >> encode [
 		nextPutAll: (ClariceHelper packNumberAsByteArray: hash size width: 4);
 		nextPutAll: hash asByteArray;
 		nextPutAll: (ClariceHelper packNumberAsByteArray: self minorVersion width: 4).
-	^ buffer
+	^ buffer contents 
 ]
 
 { #category : #accessing }

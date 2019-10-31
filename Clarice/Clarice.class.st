@@ -80,34 +80,16 @@ Clarice class >> initializeMe [
 
 ]
 
-{ #category : #messages }
-Clarice class >> loginAs: myUsername with: myPassword [
+{ #category : #actions }
+Clarice class >> login [
 	"I am the login method"
 
 	"login ( or connect first) to the soulseek server and send our initializing packets ( upload speed, share count, joined rooms, etc.)"
 
-	Transcript
-		show: 'I am the login method';
-		cr.
-
-	"I will test if username is valid"
-	myUsername ifNil: [ self error: 'Invalid username' ].
-	"I will test if password is valid"
-	myPassword ifNil: [ self error: 'Invalid password' ].
-
-	"--- Open a socket ---"
-	self
-		serverSocket: (SocketStream openConnectionToHostNamed: 'vps.slsknet.org' port: 2416).	"Zdc"
-	"--- set socket as binary ---"
-	self serverSocket binary.
-	self serverSocket autoFlush: true.
-
 	"--- Send the buffer to the server ---"
+
 	self
-		sendMessage: (SSLogin username: myUsername password: myPassword).
-	self serverSocket isConnected
-		ifFalse: [ self error: 'Socket not connected' ].
-	self processServerResponse
+		sendMessage: (SSLogin username: self username password: self password) encode.
 ]
 
 { #category : #accessing }
@@ -120,11 +102,66 @@ Clarice class >> password: aString [
 Password:=aString 
 ]
 
+{ #category : #processing }
+Clarice class >> processLoginResponse: response [
+	"I process the login message response"
+
+	| chunk |
+	chunk := response next: 4.
+	(chunk reverse asInteger) = 1
+		ifFalse: [ Transcript show: (response next: response size - 4) ].
+	self halt
+]
+
+{ #category : #processing }
+Clarice class >> processServerResponse [
+	"I  process the server response"
+
+	| chunk response responseCode responseSize |
+	"--- wait until there' data available ---"
+	"--- first four bytes is message size (not including these bytes)---"
+	chunk := self serverSocket next: 4.
+	responseSize := chunk reverse asInteger - 4.
+	"--- next four bytes is response code ---"
+	chunk := self serverSocket next: 4.
+	responseCode := chunk reverse asInteger.
+	Transcript
+		traceCr: 'Message code ' , responseCode asString , ' received'.
+	"--- read response ---"
+	response := self serverSocket next: responseSize.
+
+	"--- do according the responseCode ---"
+	"--- code 1 is a response to the login message ---"
+	"	responseCode = 1
+		ifTrue: [ self processLoginResponse: response ]"
+]
+
 { #category : #run }
 Clarice class >> run [
-	self initializeMe.
-	self connect.
+	self
+		initializeMe;
+		connect;
+		login.
+		
+	[ self serverSocket isDataAvailable ]
+		whileFalse: [ (Delay forMilliseconds: 100) wait ].
+	[ self serverSocket isDataAvailable ]
+		whileTrue: [ self processServerResponse ]
+]
 
+{ #category : #messages }
+Clarice class >> sendMessage: aMessageEncoded [
+	"I send messages to the SoulSeek server"
+
+	"--- Send the buffer to the server ---"
+
+	self serverSocket
+		nextPutAll:
+			(ClariceHelper
+				packNumberAsByteArray: aMessageEncoded size asByteArray
+				width: 4);
+		nextPutAll: aMessageEncoded .
+	self serverSocket flush
 ]
 
 { #category : #accessing }
@@ -157,70 +194,8 @@ Clarice class >> serverSocket: aSocketStream [
 	ServerSocket := aSocketStream
 ]
 
-{ #category : #accessing }
-Clarice class >> username [
-^Username
-]
-
-{ #category : #accessing }
-Clarice class >> username: aString [
-Username:=aString
-]
-
 { #category : #messages }
-Clarice >> processLoginResponse: response [
-	"I process the login message response"
-
-	| chunk |
-	chunk := response next: 4.
-	chunk reverse asInteger = 1
-		ifFalse: [ Transcript show: (response next: response size - 4) ].
-		
-		self halt.
-]
-
-{ #category : #messages }
-Clarice >> processServerResponse [
-	"I  process the server response"
-
-	| chunk response responseCode responseSize |
-	"--- wait until there' data available ---"
-	[ self serverSocket isDataAvailable ]
-		whileFalse: [ (Delay forMilliseconds: 100) wait ].
-
-	"--- first four bytes is message size (not including these bytes)---"
-	chunk := self serverSocket next: 4.
-	responseSize := chunk reverse asInteger - 4.
-	"--- next four bytes is response code ---"
-	chunk := self serverSocket next: 4.
-	responseCode := chunk reverse asInteger.
-	"--- read response ---"
-	response := self serverSocket next: responseSize.
-	"--- do according the responseCode ---"
-	"--- code 1 is a response to the login message ---"
-	responseCode = 1
-		ifTrue: [ self processLoginResponse: response ]
-]
-
-{ #category : #messages }
-Clarice >> sendMessage: aMessage [
-	"I send messages to the SoulSeek server"
-
-	"--- Send the buffer to the server ---"
-
-	self serverSocket
-		nextPutAll:
-			(ClariceHelper
-				packNumberAsByteArray: aMessage encode size asByteArray
-				width: 4);
-		"		nextPutAll: aByteArray contents."
-			nextPutAll: aMessage encode.
-	"packNumberAsByteArray: aByteArray size asByteArray"
-	self serverSocket flush
-]
-
-{ #category : #messages }
-Clarice >> setListeningPort: aPort [
+Clarice class >> setListeningPort: aPort [
 	"I take a parameter and send a message to the server telling is the listening port"
 
 	| buffer |
@@ -240,4 +215,14 @@ Clarice >> setListeningPort: aPort [
 
 	"--- Send the buffer to the server ---"
 	self sendMessage: buffer
+]
+
+{ #category : #accessing }
+Clarice class >> username [
+^Username
+]
+
+{ #category : #accessing }
+Clarice class >> username: aString [
+Username:=aString
 ]
