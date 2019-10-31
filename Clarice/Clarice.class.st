@@ -56,20 +56,20 @@ Clarice class >> clariceUserInfoSettingsOn: aBuilder [
 				description: 'Please enter your SoulSeek account password' ]
 ]
 
-{ #category : #initialize }
-Clarice class >> connect [ 
+{ #category : #actions }
+Clarice class >> connect [
 	"--- Open the server socket ---"
+
 	self
 		serverSocket:
 			(SocketStream
 				openConnectionToHostNamed: self serverName
 				port: self serverPort).
-	self serverSocket isConnected
-		ifFalse: [ self error: 'Server connection failed' ].
 	"--- set socket as binary ---"
 	self serverSocket
 		binary;
-		autoFlush: true
+		autoFlush: true.
+	self serverSocket		isConnected ifFalse: [ self error: 'Server connection failed' ]
 ]
 
 { #category : #initialize }
@@ -119,21 +119,26 @@ Clarice class >> processServerResponse [
 
 	| chunk response responseCode responseSize |
 	"--- wait until there' data available ---"
-	"--- first four bytes is message size (not including these bytes)---"
-	chunk := self serverSocket next: 4.
-	responseSize := chunk reverse asInteger - 4.
-	"--- next four bytes is response code ---"
-	chunk := self serverSocket next: 4.
-	responseCode := chunk reverse asInteger.
-	Transcript
-		traceCr: 'Message code ' , responseCode asString , ' received'.
-	"--- read response ---"
-	response := self serverSocket next: responseSize.
-
-	"--- do according the responseCode ---"
-	"--- code 1 is a response to the login message ---"
-	"	responseCode = 1
+	[ self serverSocket isDataAvailable ]
+		whileFalse: [ (Delay forMilliseconds: 100) wait ].
+	[ self serverSocket isDataAvailable ]
+		whileTrue:
+			[ "--- do according the responseCode ---"
+			"--- code 1 is a response to the login message ---"
+			"	responseCode = 1
 		ifTrue: [ self processLoginResponse: response ]"
+			(Delay forSeconds: 1) wait.
+
+			"--- first four bytes is message size (not including these bytes)---"
+			chunk := self serverSocket next: 4.
+			responseSize := chunk reverse asInteger - 4.
+			"--- next four bytes is response code ---"
+			chunk := self serverSocket next: 4.
+			responseCode := chunk reverse asInteger.
+			Transcript
+				traceCr: 'Message code ' , responseCode asString , ' received'.
+			"--- read response ---"
+			response := self serverSocket next: responseSize ]
 ]
 
 { #category : #run }
@@ -142,11 +147,7 @@ Clarice class >> run [
 		initializeMe;
 		connect;
 		login.
-		
-	[ self serverSocket isDataAvailable ]
-		whileFalse: [ (Delay forMilliseconds: 100) wait ].
-	[ self serverSocket isDataAvailable ]
-		whileTrue: [ self processServerResponse ]
+	self processServerResponse
 ]
 
 { #category : #messages }
