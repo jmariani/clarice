@@ -79,9 +79,8 @@ Clarice class >> initializeMe [
 
 	"This method initializes several variables"
 
-	self
-		scheduler: TaskScheduler new.
-		self scheduler start
+self schedulerInit .
+self connect 
 ]
 
 { #category : #actions }
@@ -147,7 +146,6 @@ Clarice class >> processServerResponse [
 Clarice class >> run [
 	self
 		initializeMe;
-		connect;
 		login.
 		self scheduler do: [ self processServerResponse  ] every: 10 seconds 
 
@@ -161,6 +159,13 @@ Clarice class >> scheduler [
 { #category : #scheduler }
 Clarice class >> scheduler: aTaskScheduler [
 	Scheduler := aTaskScheduler
+]
+
+{ #category : #'as yet unclassified' }
+Clarice class >> schedulerInit [
+	self
+		scheduler: TaskScheduler new.
+		self scheduler start
 ]
 
 { #category : #messages }
