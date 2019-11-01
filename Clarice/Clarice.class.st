@@ -6,6 +6,7 @@ Class {
 	#superclass : #Object,
 	#classVars : [
 		'Password',
+		'Scheduler',
 		'ServerName',
 		'ServerPort',
 		'ServerSocket',
@@ -78,6 +79,9 @@ Clarice class >> initializeMe [
 
 	"This method initializes several variables"
 
+	self
+		scheduler: TaskScheduler new.
+		self scheduler start
 ]
 
 { #category : #actions }
@@ -118,17 +122,15 @@ Clarice class >> processServerResponse [
 	"I  process the server response"
 
 	| chunk response responseCode responseSize |
+	"--- Stop scheduler ---"
+		self scheduler stop.
 	"--- wait until there' data available ---"
 	[ self serverSocket isDataAvailable ]
-		whileFalse: [ (Delay forMilliseconds: 100) wait ].
-	[ self serverSocket isDataAvailable ]
-		whileTrue:
-			[ "--- do according the responseCode ---"
+		whileTrue: [ (Delay forMilliseconds: 100) wait.
+			"--- do according the responseCode ---"
 			"--- code 1 is a response to the login message ---"
 			"	responseCode = 1
 		ifTrue: [ self processLoginResponse: response ]"
-			(Delay forSeconds: 1) wait.
-
 			"--- first four bytes is message size (not including these bytes)---"
 			chunk := self serverSocket next: 4.
 			responseSize := chunk reverse asInteger - 4.
@@ -138,7 +140,7 @@ Clarice class >> processServerResponse [
 			Transcript
 				traceCr: 'Message code ' , responseCode asString , ' received'.
 			"--- read response ---"
-			response := self serverSocket next: responseSize ]
+			response := self serverSocket next: responseSize ].
 ]
 
 { #category : #run }
@@ -147,7 +149,18 @@ Clarice class >> run [
 		initializeMe;
 		connect;
 		login.
-	self processServerResponse
+		self scheduler do: [ self processServerResponse  ] every: 10 seconds 
+
+]
+
+{ #category : #scheduler }
+Clarice class >> scheduler [
+	^Scheduler
+]
+
+{ #category : #scheduler }
+Clarice class >> scheduler: aTaskScheduler [
+	Scheduler := aTaskScheduler
 ]
 
 { #category : #messages }
