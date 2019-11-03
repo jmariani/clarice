@@ -122,7 +122,8 @@ Clarice class >> processServerResponse [
 
 	| chunk response responseCode responseSize |
 	"--- Stop scheduler ---"
-		self scheduler stop.
+	self scheduler isRunning ifTrue: [
+		self scheduler stop].
 	"--- wait until there' data available ---"
 	[ self serverSocket isDataAvailable ]
 		whileTrue: [ (Delay forMilliseconds: 100) wait.
@@ -136,15 +137,20 @@ Clarice class >> processServerResponse [
 			"--- next four bytes is response code ---"
 			chunk := self serverSocket next: 4.
 			responseCode := chunk reverse asInteger.
+			
 			Transcript
 				traceCr: 'Message code ' , responseCode asString , ' received'.
 			"--- read response ---"
 			response := self serverSocket next: responseSize ].
+			"--- Restart scheduler ---"
+		self scheduler start.
+
 ]
 
 { #category : #run }
 Clarice class >> run [
 	self
+	stop;
 		initializeMe;
 		login.
 		self scheduler do: [ self processServerResponse  ] every: 10 seconds 
@@ -161,7 +167,7 @@ Clarice class >> scheduler: aTaskScheduler [
 	Scheduler := aTaskScheduler
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #initialize }
 Clarice class >> schedulerInit [
 	self
 		scheduler: TaskScheduler new.
@@ -234,6 +240,12 @@ Clarice class >> setListeningPort: aPort [
 
 	"--- Send the buffer to the server ---"
 	self sendMessage: buffer
+]
+
+{ #category : #run }
+Clarice class >> stop [ 
+self scheduler stop.
+self serverSocket close 
 ]
 
 { #category : #accessing }
