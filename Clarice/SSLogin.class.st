@@ -16,9 +16,16 @@ Message structure:
 Class {
 	#name : #SSLogin,
 	#superclass : #SSServerMessage,
+	#instVars : [
+		'greet',
+		'ip',
+		'passwordDigest',
+		'reason',
+		'status'
+	],
 	#classVars : [
-		'password',
-		'username'
+		'Password',
+		'Username'
 	],
 	#category : #Clarice
 }
@@ -53,27 +60,109 @@ SSLogin class >> encode [
 
 { #category : #accessing }
 SSLogin class >> password [
-	^ password
+	^ Password
 ]
 
 { #category : #accessing }
 SSLogin class >> password: anObject [
-	password := anObject
+	Password := anObject
 ]
 
 { #category : #accessing }
 SSLogin class >> username [
-	^ username
+	^ Username
 ]
 
 { #category : #accessing }
 SSLogin class >> username: anObject [
-	username := anObject
+	Username := anObject
 ]
 
-{ #category : #'instance creation' }
+{ #category : #accessing }
 SSLogin class >> username: anUsername password: aPassword [
-	self username: anUsername;password: aPassword .
+	Username:= anUsername.
+	Password:= aPassword.
 	
 	
+]
+
+{ #category : #converting }
+SSLogin >> decode: aStream [
+	| chunk ip1 ip2 ip3 ip4 reasonSize |
+	"--- first four bytes is the status: 1-Success, 0-Failure ---"
+	chunk := aStream next: 4.
+	status := chunk reverse asInteger.
+	status = 1
+		ifFalse: [ reasonSize := chunk reverse asInteger.
+			reason := aStream next: reasonSize.
+			Transcript
+				show: 'Login failed';
+				cr ]
+		ifTrue: [ "--- swallow one next byte ---"
+			chunk := aStream next: 1.
+			"--- next four bytes is my IP (reversed) ---"
+			ip4 := aStream next: 1.
+			ip3 := aStream next: 1.
+			ip2 := aStream next: 1.
+			ip1 := aStream next: 1.
+			ip := {ip1.
+			ip2.
+			ip3.
+			ip4}.
+			"--- next four bytes is length of password digest ---"
+			chunk := aStream next: 4.
+			passwordDigest := aStream next: chunk reverse asInteger.
+			Transcript
+				show: 'Login successful';
+				cr ]
+]
+
+{ #category : #accessing }
+SSLogin >> greet [
+	^ greet
+]
+
+{ #category : #accessing }
+SSLogin >> greet: anObject [
+	greet := anObject
+]
+
+{ #category : #accessing }
+SSLogin >> ip [
+	^ ip
+]
+
+{ #category : #accessing }
+SSLogin >> ip: anObject [
+	ip := anObject
+]
+
+{ #category : #accessing }
+SSLogin >> passwordDigest [
+	^ passwordDigest
+]
+
+{ #category : #accessing }
+SSLogin >> passwordDigest: anObject [
+	passwordDigest := anObject
+]
+
+{ #category : #accessing }
+SSLogin >> reason [
+	^ reason
+]
+
+{ #category : #accessing }
+SSLogin >> reason: anObject [
+	reason := anObject
+]
+
+{ #category : #accessing }
+SSLogin >> status [
+	^ status
+]
+
+{ #category : #accessing }
+SSLogin >> status: anObject [
+	status := anObject
 ]

@@ -5,6 +5,7 @@ Class {
 	#name : #Clarice,
 	#superclass : #Object,
 	#classVars : [
+		'ListeningPort',
 		'Password',
 		'Scheduler',
 		'ServerName',
@@ -48,13 +49,17 @@ Clarice class >> clariceUserInfoSettingsOn: aBuilder [
 		with: [ (aBuilder setting: #username)
 				order: 1;
 				default: '';
-				label: 'Username' translated;				
+				label: 'Username' translated;
 				description: 'Please enter your SoulSeek account name.'.
 			(aBuilder setting: #password)
 				order: 2;
 				default: '';
 				label: 'Password' translated;
-				description: 'Please enter your SoulSeek account password' ]
+				description: 'Please enter your SoulSeek account password'.			(aBuilder setting: #listeningPort)
+				order: 3;
+				default: 2234;
+				label: 'Listening port' translated;
+				description: 'Please enter Clarice''s listening port' ]
 ]
 
 { #category : #actions }
@@ -83,6 +88,16 @@ self schedulerInit .
 self connect 
 ]
 
+{ #category : #accessing }
+Clarice class >> listeningPort [
+^ListeningPort
+]
+
+{ #category : #accessing }
+Clarice class >> listeningPort: aNumber [
+ListeningPort := aNumber
+]
+
 { #category : #actions }
 Clarice class >> login [
 	"I am the login method"
@@ -90,9 +105,9 @@ Clarice class >> login [
 	"login ( or connect first) to the soulseek server and send our initializing packets ( upload speed, share count, joined rooms, etc.)"
 
 	"--- Send the buffer to the server ---"
-
+Transcript show: 'Logging in as ', self username , ' with ', self password;cr.
 	self
-		sendMessage: (SSLogin username: self username password: self password) encode.
+		sendMessage: (SSLogin username: self username password: self password) encode
 ]
 
 { #category : #accessing }
@@ -106,55 +121,54 @@ Password:=aString
 ]
 
 { #category : #processing }
-Clarice class >> processLoginResponse: response [
-	"I process the login message response"
-
-	| chunk |
-	chunk := response next: 4.
-	(chunk reverse asInteger) = 1
-		ifFalse: [ Transcript show: (response next: response size - 4) ].
-	self halt
-]
-
-{ #category : #processing }
 Clarice class >> processServerResponse [
 	"I  process the server response"
 
 	| chunk response responseCode responseSize |
+	GrowlMorph openWithLabel: 'Clarice' contents: 'Processing server response...'.
+
+	Transcript
+		show: 'Processing server response...';
+		cr.
 	"--- Stop scheduler ---"
-	self scheduler isRunning ifTrue: [
-		self scheduler stop].
+	self scheduler isRunning
+		ifTrue: [ self scheduler stop ].
 	"--- wait until there' data available ---"
 	[ self serverSocket isDataAvailable ]
-		whileTrue: [ (Delay forMilliseconds: 100) wait.
-			"--- do according the responseCode ---"
-			"--- code 1 is a response to the login message ---"
-			"	responseCode = 1
-		ifTrue: [ self processLoginResponse: response ]"
-			"--- first four bytes is message size (not including these bytes)---"
+		whileTrue: [ (Delay forSeconds: 1) wait.
 			chunk := self serverSocket next: 4.
 			responseSize := chunk reverse asInteger - 4.
-			"--- next four bytes is response code ---"
 			chunk := self serverSocket next: 4.
 			responseCode := chunk reverse asInteger.
-			
 			Transcript
-				traceCr: 'Message code ' , responseCode asString , ' received'.
-			"--- read response ---"
-			response := self serverSocket next: responseSize ].
-			"--- Restart scheduler ---"
-		self scheduler start.
-
+				trace:
+					'Message code ' , responseCode asString , ' received. Size: '
+						, responseSize asString;
+				cr.
+			response := self serverSocket next: responseSize.
+			responseCode = 1
+				ifTrue: [ | x |
+					x := SSLogin new.
+					x decode: (ReadStream on: response).
+					x status = 1
+						ifTrue: [ self setListeningPort ] ].
+			responseCode = 64
+				ifTrue: [ | x |
+					Transcript
+						show: 'Processing room list';
+						cr.
+					x := SSRoomList new.
+					x decode: (ReadStream on: response) ] ].
+	self scheduler start
 ]
 
 { #category : #run }
 Clarice class >> run [
 	self
-	stop;
+		stop;
 		initializeMe;
 		login.
-		self scheduler do: [ self processServerResponse  ] every: 10 seconds 
-
+	self scheduler do: [ self processServerResponse ] every: 10 seconds
 ]
 
 { #category : #scheduler }
@@ -220,26 +234,10 @@ Clarice class >> serverSocket: aSocketStream [
 ]
 
 { #category : #messages }
-Clarice class >> setListeningPort: aPort [
-	"I take a parameter and send a message to the server telling is the listening port"
-
-	| buffer |
-	Transcript
-		show: 'I am the setListeningPort method';
-		cr.
-
-	"set up buffer"
-	buffer := ByteArray new writeStream.
-
-	"fill buffer"
-	buffer
-		nextPutAll: (ClariceHelper packNumberAsByteArray: 2 width: 4);
-		nextPutAll: (ClariceHelper packNumberAsByteArray: aPort width: 4).
-
-	"--- Use existing socket ---"
-
-	"--- Send the buffer to the server ---"
-	self sendMessage: buffer
+Clarice class >> setListeningPort [
+Transcript show: 'Setting listening port to: ',(self listeningPort) asString;cr.
+	self
+		sendMessage: (SSSetListeningPort port: self listeningPort) encode
 ]
 
 { #category : #run }

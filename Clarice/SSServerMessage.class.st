@@ -139,3 +139,8 @@ SSServerMessage class >> minorVersion [
 SSServerMessage class >> minorVersionPacked [
 	^ ClariceHelper packNumberAsByteArray: self minorVersion   width: 4
 ]
+
+{ #category : #converting }
+SSServerMessage >> decode: aStream [
+^self subclassResponsibility 
+]
